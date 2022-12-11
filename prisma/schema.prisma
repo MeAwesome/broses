@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../broses.db"
+}
+
+model Role {
+  id String @id
+  users User[]
+  messagesMentionedIn MessageMentions[]
+}
+
+model User {
+  id String @id
+  username String
+  displayname String
+  discriminator Int
+  avatar String
+  roles Role[]
+  messages Message[]
+  messagesMentionedIn MessageMentions[] @relation("mentionedUsers")
+  messagesRepliedIn MessageMentions[] @relation("repliedUser")
+}
+
+model Message {
+  id String @id
+  channelId String
+  guildId String
+  createdTimestamp DateTime
+  author User @relation(fields: [authorId], references: [id])
+  authorId String
+  content String?
+  pinned Boolean
+  tts Boolean
+  reactions MessageReactions?
+  mentions MessageMentions?
+  attachments MessageAttachments?
+}
+
+model MessageReactions {
+  id Int @id @default(autoincrement())
+  message Message @relation(fields: [messageId], references: [id])
+  messageId String @unique
+}
+
+model MessageMentions {
+  id Int @id @default(autoincrement())
+  message Message @relation(fields: [messageId], references: [id])
+  messageId String @unique
+  everyone Boolean
+  users User[] @relation("mentionedUsers")
+  roles Role[]
+  repliedUser User @relation("repliedUser", fields: [repliedUserId], references: [id])
+  repliedUserId String
+}
+
+model MessageAttachments {
+  id String @id
+  message Message @relation(fields: [messageId], references: [id])
+  messageId String @unique
+  attachment String
+  name String
+  description String
+  contentType String
+}
