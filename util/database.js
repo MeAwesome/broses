@@ -1,7 +1,10 @@
+const syncedChannels = [];
+
 async function syncChannel(channel, force) {
     let lastMessageStored = await getLastMessageFromChannel(channel) || {};
     let lastId = null;
     let size = 100;
+    let lastMessageReached = false;
     if((lastMessageStored.id !== channel.lastMessageId) || force) {
         while(size == 100){
             const messages = await discord.getMessages(channel, {
@@ -13,6 +16,9 @@ async function syncChannel(channel, force) {
             }
             const transactions = [];
             messages.forEach(message => {
+                if(message.id == lastMessageStored.id){
+                    lastMessageReached = true;
+                }
                 transactions.push(prisma.message.upsert({
                     where: {
                         id: message.id
@@ -49,14 +55,18 @@ async function syncChannel(channel, force) {
             });
             await prisma.$transaction(transactions);
             lastId = messages.last().id;
-            size = messages.size;
+            size = lastMessageReached ? 0 : messages.size;
         }
     }
+    syncedChannels.push(channel.id);
     console.log(`${channel.name} - DONE!`);
 }
 
 async function newMessage(message) {
     //console.log(message);
+    if(syncedChannels.indexOf(message.channelId) < 0){
+        return;
+    }
     await prisma.message.create({
         data: {
             id: message.id,

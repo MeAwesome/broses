@@ -63,8 +63,9 @@ async function main(){
             //console.log(`${channel.name} - ${channel}`);
             //console.log(channel);
             
-            //await database.syncChannel(channel);
+            await database.syncChannel(channel);
         }
+        console.log("ALL CHANNELS SYNCED");
         
 
         for(let memberData of members){
