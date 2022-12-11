@@ -52,62 +52,22 @@ async function main(){
         console.log(`Logged in as ${client.user.tag}!`);
 
         discord.setGuild(GUILD_ID);
-        const members = await discord.getMembers();
-        const channels = await discord.getChannels();
 
-        //console.log(channels);
         //await prisma.message.deleteMany({});
 
-        for(let channel of channels) {
-            //let message = await database.getLastMessageFromChannel(channel) || {};
-            //console.log(`${channel.name} - ${channel}`);
-            //console.log(channel);
-            
-            await database.syncChannel(channel);
-        }
-        console.log("ALL CHANNELS SYNCED");
-        
-
-        for(let memberData of members){
-            let member = memberData[1];
-            let user = members.get(memberData[0]);
-            
-            await prisma.user.upsert({
-                where: {
-                    id: member.user.id,
-                },
-                update: {
-                    username: member.user.username,
-                    displayname: user.displayName,
-                    discriminator: parseInt(member.user.discriminator),
-                    avatar: member.user.avatar || ""
-                },
-                create: {
-                    id: member.user.id,
-                    username: member.user.username,
-                    displayname: user.displayName,
-                    discriminator: parseInt(member.user.discriminator),
-                    avatar: member.user.avatar || ""
-                }
-            });
-        }
-
-        
-
-        // const allUsers = await prisma.user.findMany()
-        // console.log(allUsers)
+        await database.syncMembers();
+        await database.syncChannels();
 
         // client.channels.cache.get("868331388007485440").messages.fetch("868331756259012648")
         //     .then(message => console.log(message))
         //     .catch(console.error);
     });
 
-    client.on("messageCreate", async message => {
-        //console.log(message);
+    client.on("messageCreate", async (message) => {
         database.newMessage(message);
     })
 
-    client.on('interactionCreate', async interaction => {
+    client.on('interactionCreate', async (interaction) => {
         if (!interaction.isChatInputCommand()) return;
 
         const command = interaction.client.commands.get(interaction.commandName);

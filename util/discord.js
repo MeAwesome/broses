@@ -14,7 +14,7 @@ function getGuild(guildId) {
 }
 
 async function getMembers() {
-    return await getMembersRaw(defaultGuild);
+    return (await getMembersRaw(defaultGuild)).values();
 }
 
 async function getChannels() {
