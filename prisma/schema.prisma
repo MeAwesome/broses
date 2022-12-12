@@ -39,6 +39,7 @@ model Message {
   content String?
   pinned Boolean
   tts Boolean
+  stillAvailable Boolean @default(true)
   reactions MessageReactions?
   mentions MessageMentions?
   attachments MessageAttachments?

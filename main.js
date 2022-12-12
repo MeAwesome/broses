@@ -1,9 +1,9 @@
 const path = require("path");
 const fs = require("fs");
-global.discord = require("./util/discord.js");
-global.database = require("./util/database.js");
 const { CLIENT_ID, TOKEN, GUILD_ID } = require("./settings.json");
-const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+const { PrismaClient } = require('@prisma/client');
 global.client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -11,10 +11,16 @@ global.client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions,
-    ] });
-const rest = new REST({ version: '10' }).setToken(TOKEN);
-const { PrismaClient } = require('@prisma/client');
+    ],
+    partials: [
+        Partials.Message,
+        Partials.Channel,
+        Partials.Reaction
+    ]
+});
 global.prisma = new PrismaClient();
+global.discord = require("./util/discord.js");
+global.database = require("./util/database.js");
 
 async function initializeCommands(){
     try {
@@ -67,6 +73,14 @@ async function main(){
         database.newMessage(message);
     })
 
+    client.on('messageUpdate', async (oldMessage, newMessage) => {
+        database.editMessage(oldMessage, newMessage);
+    })
+    
+    client.on('messageDelete', async (message) => {
+        database.deleteMessage(message);
+    })
+
     client.on('interactionCreate', async (interaction) => {
         if (!interaction.isChatInputCommand()) return;
 
@@ -81,7 +95,7 @@ async function main(){
             await command.execute(interaction);
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+            //await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
         }
     });
 

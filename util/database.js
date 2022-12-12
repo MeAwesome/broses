@@ -1,5 +1,17 @@
 const syncedChannels = [];
 
+async function fullSync() {
+    console.log("\n--STARTING FULLSYNC--\n ! This will take a while ! \n");
+    await syncMembers();
+    await prisma.message.updateMany({
+        data: {
+            stillAvailable: false
+        }
+    });
+    await syncChannels(true);
+    console.log("\n--FULLSYNC COMPLETE--\n");
+}
+
 async function syncMembers() {
     console.log("\n--STARTING MEMBER SYNC--\n");
     const members = await discord.getMembers();
@@ -9,13 +21,13 @@ async function syncMembers() {
     console.log("\n--ALL MEMBERS SYNCED--\n");
 }
 
-async function syncChannels() {
+async function syncChannels(force) {
     console.log("\n--STARTING CHANNEL SYNC--\n");
     const channels = await discord.getChannels();
     for (let channel of channels) {
-        await syncChannel(channel);
+        await syncChannel(channel, force);
     }
-    console.log("\n--ALL CHANNELS SYNCED--\n");
+    console.log("\n--ALL CHANNELS SYNCED--\n ! A FullSync might still be required if messages were edited or deleted while the bot was offline ! \n");
 }
 
 async function syncMember(member) {
@@ -63,6 +75,32 @@ async function newMessage(message) {
     });
 }
 
+async function editMessage(oldMessage, newMessage) {
+    if (syncedChannels.indexOf(oldMessage.channelId) < 0) {
+        return;
+    }
+    await prisma.message.update({
+        where: {
+            id: oldMessage.id
+        },
+        data: updateMessageJSON(newMessage)
+    });
+}
+
+async function deleteMessage(message) {
+    if (syncedChannels.indexOf(message.channelId) < 0) {
+        return;
+    }
+    await prisma.message.update({
+        where: {
+            id: message.id
+        },
+        data: {
+            stillAvailable: false
+        }
+    });
+}
+
 async function getLastMessageFromChannel(channel) {
     return (await prisma.message.findFirst({
         where: {
@@ -98,7 +136,8 @@ function updateMessageJSON(message) {
     return {
         content: message.content,
         pinned: message.pinned,
-        tts: message.tts
+        tts: message.tts,
+        stillAvailable: true
     }
 }
 
@@ -118,7 +157,8 @@ function createMessageJSON(message) {
         },
         content: message.content,
         pinned: message.pinned,
-        tts: message.tts
+        tts: message.tts,
+        stillAvailable: true
     };
 }
 
@@ -148,5 +188,5 @@ function createMemberJSON(member, fromMessage) {
 }
 
 module.exports = {
-    newMessage, syncChannels, syncMembers
+    newMessage, editMessage, deleteMessage, syncChannels, syncMembers, fullSync
 }
