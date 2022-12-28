@@ -1,14 +1,20 @@
-const syncedChannels = [];
+const db = require("./database/prismaHelper.js");
+
+let allMessages = {};
+//const syncedChannels = {};
 
 async function fullSync() {
     console.log("\n--STARTING FULLSYNC--\n ! This will take a while ! \n");
+    console.time("fullsync");
     await syncMembers();
-    await prisma.message.updateMany({
+    let query = (await db.query("message", "updateMany", {
         data: {
             stillAvailable: false
         }
-    });
+    })).query;
+    await db.execute(query);
     await syncChannels(true);
+    console.timeEnd("fullsync");
     console.log("\n--FULLSYNC COMPLETE--\n");
 }
 
@@ -24,92 +30,148 @@ async function syncMembers() {
 async function syncChannels(force) {
     console.log("\n--STARTING CHANNEL SYNC--\n");
     const channels = await discord.getChannels();
+    const promises = [];
     for (let channel of channels) {
-        await syncChannel(channel, force);
+        allMessages[channel.id] = [];
+        //syncedChannels[channel.id] = false;
+        promises.push(syncChannel(channel, force));
     }
+    await Promise.all(promises);
+    console.log("All channels ready for upgrades");
+    for (let channelMessages of Object.values(allMessages).filter((messages) => messages.length > 0)) {
+        console.time("transaction");
+        let transaction = (await db.transaction(channelMessages)).transaction;
+        await db.execute(transaction);
+        console.timeEnd("transaction");
+    }
+    allMessages = {};
     console.log("\n--ALL CHANNELS SYNCED--\n ! A FullSync might still be required if messages were edited or deleted while the bot was offline ! \n");
 }
 
 async function syncMember(member) {
-    await prisma.user.upsert(upsertMemberJSON(member));
+    let query = (await db.query("user", "upsert", upsertMemberJSON(member))).query;
+    await db.execute(query);
     console.log(`${member.user.username} in sync!`);
 }
 
 async function syncChannel(channel, force) {
-    let lastMessageStored = await getLastMessageFromChannel(channel);
-    let lastId = null;
-    let size = 100;
-    let lastMessageReached = false;
-    if ((lastMessageStored.id !== channel.lastMessageId) || force) {
-        while (size == 100) {
-            const messages = await discord.getMessages(channel, {
-                limit: 100,
-                before: lastId
-            });
-            if (!messages.last()) {
-                break;
-            }
-            const transactions = [];
-            messages.forEach(message => {
-                if (message.id == lastMessageStored.id && !force) {
-                    lastMessageReached = true;
+    return new Promise(async (resolve, reject) => {
+        let lastMessageStored = await getLastMessageFromChannel(channel);
+        let lastId = null;
+        let size = 100;
+        let lastMessageReached = false;
+        if ((lastMessageStored.id !== channel.lastMessageId) || force) {
+            while (size == 100) {
+                const messages = await discord.getMessages(channel, {
+                    limit: 100,
+                    before: lastId
+                })
+                if (!messages.last()) {
+                    break;
                 }
-                transactions.push(prisma.message.upsert(upsertMessageJSON(message)));
-            });
-            await prisma.$transaction(transactions);
-            lastId = messages.last().id;
-            size = lastMessageReached ? 0 : messages.size;
+                const messageValues = messages.values();
+                for (const message of messageValues) {
+                    if (message.id == lastMessageStored.id && !force) {
+                        lastMessageReached = true;
+                        break;
+                    }
+                    let query = (await db.query("message", "upsert", upsertMessageJSON(message))).query;
+                    //console.log(query);
+                    allMessages[channel.id].push(query);//prisma.message.upsert(upsertMessageJSON(message)));
+                    //db.execute(query);
+                }
+                lastId = messages.last().id;
+                //console.log(`${channel.name}: ${allMessages[channel.id].length}`);
+                size = lastMessageReached ? 0 : messages.size;
+            }
+            //console.log("beginning transaction for " + channel.name + " " + allMessages[channel.id]);
+            //console.log(allMessages[channel.id]);
+            //let transaction = (await db.transaction(allMessages[channel.id])).transaction;
+            //await db.execute(transaction);
+            //syncedChannels[channel.id] = true;
+            console.log(`${channel.name} is ready for upgrades`);
+            //resolve();
+
+            // const transactions = [];
+            // while (size == 100) {
+            //     const messages = await discord.getMessages(channel, {
+            //         limit: 100,
+            //         before: lastId
+            //     });
+            //     if (!messages.last()) {
+            //         break;
+            //     }
+            //     const messageValues = messages.values();
+            //     for(const message of messageValues){
+            //         if (message.id == lastMessageStored.id && !force) {
+            //             lastMessageReached = true;
+            //             break;
+            //         }
+            //         transactions.push(prisma.message.upsert(upsertMessageJSON(message)));
+            //         //await db.execute(prisma.message.upsert(upsertMessageJSON(message)), test++);
+            //     }
+            //     lastId = messages.last().id;
+            //     size = lastMessageReached ? 0 : messages.size;
+            //     console.log(transactions.length);
+            // }
+            // console.log("starting transactions");
+            // await db.execute(prisma.$transaction(transactions));
         }
-    }
-    syncedChannels.push(channel.id);
-    console.log(`${channel.name} in sync!`);
+        //syncedChannels.push(channel.id);
+        //console.log(`${channel.name} in sync!`);
+        resolve();
+    });
 }
 
 async function newMessage(message) {
     //console.log(message);
-    if (syncedChannels.indexOf(message.channelId) < 0) {
-        return;
-    }
-    await prisma.message.create({
+    // if (syncedChannels.indexOf(message.channelId) < 0) {
+    //     return;
+    // }
+    let query = (await db.query("message", "create", {
         data: createMessageJSON(message)
-    });
+    })).query;
+    db.execute(query);
 }
 
 async function editMessage(oldMessage, newMessage) {
-    if (syncedChannels.indexOf(oldMessage.channelId) < 0) {
-        return;
-    }
-    await prisma.message.update({
+    // if (syncedChannels.indexOf(oldMessage.channelId) < 0) {
+    //     return;
+    // }
+    let query = (await db.query("message", "update", {
         where: {
             id: oldMessage.id
         },
         data: updateMessageJSON(newMessage)
-    });
+    })).query;
+    db.execute(query);
 }
 
 async function deleteMessage(message) {
-    if (syncedChannels.indexOf(message.channelId) < 0) {
-        return;
-    }
-    await prisma.message.update({
+    // if (syncedChannels.indexOf(message.channelId) < 0) {
+    //     return;
+    // }
+    let query = (await db.query("message", "update", {
         where: {
             id: message.id
         },
         data: {
             stillAvailable: false
         }
-    });
+    })).query;
+    db.execute(query);
 }
 
 async function getLastMessageFromChannel(channel) {
-    return (await prisma.message.findFirst({
+    let query = (await db.query("message", "findFirst", {
         where: {
             channelId: channel.id
         },
         orderBy: {
             createdTimestamp: 'desc'
         }
-    })) || {}
+    })).query;
+    return (await db.execute(query)) || {}
 }
 
 function upsertMessageJSON(message) {

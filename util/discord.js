@@ -22,7 +22,7 @@ async function getChannels() {
 }
 
 async function getMessages(channel, options) {
-    return await channel.messages.fetch(options);
+    return (await getMessagesRaw(channel, options))//.values();
 }
 
 function getGuildRaw(guildId) {
