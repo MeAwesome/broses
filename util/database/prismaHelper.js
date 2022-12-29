@@ -5,19 +5,6 @@ const maxRetries = 5;
 let ready = true;
 let retries = 0;
 
-/*
-
-Database failed because of an open transation while trying
-to write or read the database. Implement queue should work
-in fixing this issue since transactions cannot be called
-at the same time and try to access a locked database.
-
-Add an item to the queue and make it await-able so that
-I can wait for updates or read data without having to wait
-for the entire queue to be done.
-
-*/
-
 async function wait(ms) {
     return new Promise(resolve => {
         setTimeout(resolve, ms)
@@ -27,7 +14,6 @@ async function wait(ms) {
 async function nextQueueItem() {
     if (ready) {
         ready = false;
-        //await prisma.$connect()
         let queueItem = queue.shift();
         let itemData;
         while(retries < maxRetries) {
@@ -50,10 +36,8 @@ async function nextQueueItem() {
             console.log("couldnt complete, out of retries");
         }
         queueItem.callback(itemData);
-        //await prisma.$disconnect()
         retries = 0;
         ready = true;
-        //console.log(queue.length);
         if (queue.length > 0) {
             nextQueueItem();
         }
@@ -105,7 +89,6 @@ async function query(database, query, data) {
                 console.log("failed failure");
                 reject(result);
             }
-            //console.log(result);
             resolve({
                 query: result
             });
@@ -120,7 +103,6 @@ async function transaction(array) {
                 console.log("failed failure");
                 reject(result);
             }
-            //console.log(result);
             resolve({
                 transaction: result
             });

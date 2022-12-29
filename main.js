@@ -22,6 +22,19 @@ global.prisma = new PrismaClient();
 global.discord = require("./util/discord.js");
 global.database = require("./util/database.js");
 
+//const getUnicode = require('emoji-unicode');
+//console.log(getUnicode("😈"));
+
+/*
+emoji css
+img {
+  vertical-align: bottom;
+  object-fit: certain;
+  width: 1.375em;
+  height: 1.375em;
+}
+*/
+
 async function initializeCommands(){
     try {
         console.log('Started refreshing application (/) commands.');
@@ -59,27 +72,21 @@ async function main(){
 
         discord.setGuild(GUILD_ID);
 
-        //await prisma.message.deleteMany({});
-
         await database.syncMembers();
         await database.syncChannels();
-
-        // client.channels.cache.get("868331388007485440").messages.fetch("868331756259012648")
-        //     .then(message => console.log(message))
-        //     .catch(console.error);
     });
 
     client.on("messageCreate", async (message) => {
         database.newMessage(message);
-    })
+    });
 
     client.on('messageUpdate', async (oldMessage, newMessage) => {
         database.editMessage(oldMessage, newMessage);
-    })
+    });
     
     client.on('messageDelete', async (message) => {
         database.deleteMessage(message);
-    })
+    });
 
     client.on('interactionCreate', async (interaction) => {
         if (!interaction.isChatInputCommand()) return;
@@ -95,10 +102,9 @@ async function main(){
             await command.execute(interaction);
         } catch (error) {
             console.error(error);
-            //await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
         }
     });
-
+    
     client.login(TOKEN);
 }
 

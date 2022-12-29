@@ -1,7 +1,6 @@
 const db = require("./database/prismaHelper.js");
 
 let allMessages = {};
-//const syncedChannels = {};
 
 async function fullSync() {
     console.log("\n--STARTING FULLSYNC--\n ! This will take a while ! \n");
@@ -33,7 +32,6 @@ async function syncChannels(force) {
     const promises = [];
     for (let channel of channels) {
         allMessages[channel.id] = [];
-        //syncedChannels[channel.id] = false;
         promises.push(syncChannel(channel, force));
     }
     await Promise.all(promises);
@@ -76,58 +74,28 @@ async function syncChannel(channel, force) {
                         break;
                     }
                     let query = (await db.query("message", "upsert", upsertMessageJSON(message))).query;
-                    //console.log(query);
-                    allMessages[channel.id].push(query);//prisma.message.upsert(upsertMessageJSON(message)));
-                    //db.execute(query);
+                    allMessages[channel.id].push(query);
+                    message.reactions.cache.forEach(async(reaction) => {
+                        const emojiName = reaction._emoji.name;
+                        const emojiCount = reaction.count
+                        console.log(`${message.content} has ${emojiCount} of ${emojiName}`);
+                        //const reactionUsers = await reaction.users.fetch();
+
+                        // Emoji URL
+                        //https://cdn.discordapp.com/emojis/${emojiID}
+                    
+                    });
                 }
                 lastId = messages.last().id;
-                //console.log(`${channel.name}: ${allMessages[channel.id].length}`);
                 size = lastMessageReached ? 0 : messages.size;
             }
-            //console.log("beginning transaction for " + channel.name + " " + allMessages[channel.id]);
-            //console.log(allMessages[channel.id]);
-            //let transaction = (await db.transaction(allMessages[channel.id])).transaction;
-            //await db.execute(transaction);
-            //syncedChannels[channel.id] = true;
             console.log(`${channel.name} is ready for upgrades`);
-            //resolve();
-
-            // const transactions = [];
-            // while (size == 100) {
-            //     const messages = await discord.getMessages(channel, {
-            //         limit: 100,
-            //         before: lastId
-            //     });
-            //     if (!messages.last()) {
-            //         break;
-            //     }
-            //     const messageValues = messages.values();
-            //     for(const message of messageValues){
-            //         if (message.id == lastMessageStored.id && !force) {
-            //             lastMessageReached = true;
-            //             break;
-            //         }
-            //         transactions.push(prisma.message.upsert(upsertMessageJSON(message)));
-            //         //await db.execute(prisma.message.upsert(upsertMessageJSON(message)), test++);
-            //     }
-            //     lastId = messages.last().id;
-            //     size = lastMessageReached ? 0 : messages.size;
-            //     console.log(transactions.length);
-            // }
-            // console.log("starting transactions");
-            // await db.execute(prisma.$transaction(transactions));
         }
-        //syncedChannels.push(channel.id);
-        //console.log(`${channel.name} in sync!`);
         resolve();
     });
 }
 
 async function newMessage(message) {
-    //console.log(message);
-    // if (syncedChannels.indexOf(message.channelId) < 0) {
-    //     return;
-    // }
     let query = (await db.query("message", "create", {
         data: createMessageJSON(message)
     })).query;
@@ -135,9 +103,6 @@ async function newMessage(message) {
 }
 
 async function editMessage(oldMessage, newMessage) {
-    // if (syncedChannels.indexOf(oldMessage.channelId) < 0) {
-    //     return;
-    // }
     let query = (await db.query("message", "update", {
         where: {
             id: oldMessage.id
@@ -148,9 +113,6 @@ async function editMessage(oldMessage, newMessage) {
 }
 
 async function deleteMessage(message) {
-    // if (syncedChannels.indexOf(message.channelId) < 0) {
-    //     return;
-    // }
     let query = (await db.query("message", "update", {
         where: {
             id: message.id
