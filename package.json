@@ -1,13 +1,15 @@
 {
   "dependencies": {
-    "@prisma/client": "^4.8.0",
+    "@prisma/client": "^4.10.1",
     "discord.js": "^14.6.0",
-    "emoji-unicode": "^2.0.1"
+    "emoji-name-map": "^1.2.9",
+    "emoji-unicode": "^2.0.1",
+    "surrealdb.js": "^0.5.0"
   },
   "scripts": {
     "start": "node main.js"
   },
   "devDependencies": {
-    "prisma": "^4.8.0"
+    "prisma": "^4.10.1"
   }
 }

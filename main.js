@@ -3,7 +3,8 @@ const fs = require("fs");
 const { CLIENT_ID, TOKEN, GUILD_ID } = require("./settings.json");
 const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
 const rest = new REST({ version: '10' }).setToken(TOKEN);
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, prisma } = require('@prisma/client');
+const { getGuild } = require("./util/discord.js");
 global.client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -21,9 +22,6 @@ global.client = new Client({
 global.prisma = new PrismaClient();
 global.discord = require("./util/discord.js");
 global.database = require("./util/database.js");
-
-//const getUnicode = require('emoji-unicode');
-//console.log(getUnicode("😈"));
 
 /*
 emoji css
@@ -72,21 +70,42 @@ async function main(){
 
         discord.setGuild(GUILD_ID);
 
+        //await global.prisma.messageReaction.deleteMany({});
+        //await global.prisma.reactionEmoji.deleteMany({});
+
+        await database.connect();
         await database.syncMembers();
         await database.syncChannels();
+
+        // fs.writeFileSync('broses.cache', JSON.stringify(getGuild(GUILD_ID)), function (err) {
+        //     if (err) throw err;
+        //     console.log('Saved!');
+        // });
     });
 
     client.on("messageCreate", async (message) => {
-        database.newMessage(message);
+        database.messageCreate(message);
     });
 
     client.on('messageUpdate', async (oldMessage, newMessage) => {
-        database.editMessage(oldMessage, newMessage);
+        database.upsertMessage(newMessage);
     });
     
     client.on('messageDelete', async (message) => {
         database.deleteMessage(message);
     });
+
+    // client.on('messageReactionAdd', async (reaction, user) => {
+    //     const message = !reaction.message.author ? await reaction.message.fetch() : reaction.message;
+    //     reaction = message.reactions.cache.get(reaction._emoji.id || reaction._emoji.name) || reaction;
+    //     database.reactionEmojiChange(reaction);
+    // });
+
+    // client.on("messageReactionRemove", async (reaction, user) => {
+    //     const message = !reaction.message.author ? await reaction.message.fetch() : reaction.message;
+    //     reaction = message.reactions.cache.get(reaction._emoji.id || reaction._emoji.name) || reaction;
+    //     database.reactionEmojiChange(reaction);
+    // });
 
     client.on('interactionCreate', async (interaction) => {
         if (!interaction.isChatInputCommand()) return;

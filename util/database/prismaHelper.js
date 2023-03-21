@@ -26,8 +26,9 @@ async function nextQueueItem() {
                     itemData = prisma.$transaction(queueItem.array);
                 }
                 break;
-            } catch {
+            } catch (e) {
                 console.log("couldnt complete, retrying...");
+                console.error(e);
                 await wait(1000);
                 retries++;
             }

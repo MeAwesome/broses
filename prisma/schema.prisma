@@ -2,72 +2,95 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-1.1.x"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:../broses.db"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model Role {
-  id String @id
-  users User[]
-  messagesMentionedIn MessageMentions[]
+  id                     String            @id @default(auto()) @map("_id") @db.ObjectId
+  userIDs                String[]          @db.ObjectId
+  users                  User[]            @relation(fields: [userIDs], references: [id])
+  messagesMentionedInIDS String[]          @db.ObjectId
+  messagesMentionedIn    MessageMentions[] @relation("roles", fields: [messagesMentionedInIDS], references: [id])
 }
 
 model User {
-  id String @id
-  username String
-  displayname String
-  discriminator Int
-  avatar String
-  roles Role[]
-  messages Message[]
-  messagesMentionedIn MessageMentions[] @relation("mentionedUsers")
-  messagesRepliedIn MessageMentions[] @relation("repliedUser")
+  id                     String            @id @default(auto()) @map("_id") @db.ObjectId
+  discordID              String            @unique
+  username               String
+  displayname            String
+  discriminator          Int
+  avatar                 String
+  roleIDs                String[]          @db.ObjectId
+  roles                  Role[]            @relation(fields: [roleIDs], references: [id])
+  messages               Message[]
+  messagesMentionedInIDs String[]          @db.ObjectId
+  messagesMentionedIn    MessageMentions[] @relation("messageMentioned", fields: [messagesMentionedInIDs], references: [id])
+  messagesRepliedIn      MessageMentions[] @relation("messageReplied")
+  messagesReactedToIDs   String[]          @db.ObjectId
+  messagesReactedTo      MessageReaction[] @relation("messageReaction", fields: [messagesReactedToIDs], references: [id])
 }
 
 model Message {
-  id String @id
-  channelId String
-  guildId String
+  id               String               @id @default(auto()) @map("_id") @db.ObjectId
+  channelId        String
+  guildId          String
   createdTimestamp DateTime
-  author User @relation(fields: [authorId], references: [id])
-  authorId String
-  content String?
-  pinned Boolean
-  tts Boolean
-  stillAvailable Boolean @default(true)
-  reactions MessageReactions?
-  mentions MessageMentions?
-  attachments MessageAttachments?
+  author           User                 @relation(fields: [authorId], references: [id])
+  authorId         String               @db.ObjectId
+  content          String?
+  cleanContent     String?
+  pinned           Boolean
+  tts              Boolean
+  stillAvailable   Boolean              @default(true)
+  reactions        MessageReaction[]
+  mentions         MessageMentions[]
+  attachments      MessageAttachments[]
 }
 
-model MessageReactions {
-  id Int @id @default(autoincrement())
-  message Message @relation(fields: [messageId], references: [id])
-  messageId String @unique
+model MessageReaction {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  reactionCount Int
+  reactionId    String        @db.ObjectId
+  reaction      ReactionEmoji @relation("reaction", fields: [reactionId], references: [id])
+  messageId     String        @db.ObjectId
+  message       Message       @relation(fields: [messageId], references: [id])
+  userIDs       String[]      @db.ObjectId
+  users         User[]        @relation("messageReaction", fields: [userIDs], references: [id])
+}
+
+model ReactionEmoji {
+  id       String            @id @default(auto()) @map("_id") @db.ObjectId
+  name     String?
+  custom   Boolean
+  animated Boolean
+  image    String
+  messages MessageReaction[] @relation("reaction")
 }
 
 model MessageMentions {
-  id Int @id @default(autoincrement())
-  message Message @relation(fields: [messageId], references: [id])
-  messageId String @unique
-  everyone Boolean
-  users User[] @relation("mentionedUsers")
-  roles Role[]
-  repliedUser User @relation("repliedUser", fields: [repliedUserId], references: [id])
-  repliedUserId String
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  message       Message  @relation(fields: [messageId], references: [id])
+  messageId     String   @db.ObjectId
+  everyone      Boolean
+  userIDs       String[] @db.ObjectId
+  users         User[]   @relation("messageMentioned", fields: [userIDs], references: [id])
+  roleIDs       String[] @db.ObjectId
+  roles         Role[]   @relation("roles", fields: [roleIDs], references: [id])
+  repliedUserID String[] @db.ObjectId
+  repliedUser   User     @relation("messageReplied", fields: [repliedUserID], references: [id])
 }
 
 model MessageAttachments {
-  id String @id
-  message Message @relation(fields: [messageId], references: [id])
-  messageId String @unique
-  attachment String
-  name String
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  message     Message @relation(fields: [messageId], references: [id])
+  messageId   String  @db.ObjectId
+  attachment  String
+  name        String
   description String
   contentType String
 }
